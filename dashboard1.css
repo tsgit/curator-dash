@@ -1,0 +1,63 @@
+body {
+    font-family: sans-serif;
+    width: 85%;
+}
+
+a:hover {
+    background-color: #dddd44;
+
+}
+
+.linkCluster {
+    color: #333333;
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #eeeeee;
+}
+
+
+.doiLine, .pdfLine, .identifierLine {
+    #background-color: #bbdddd;
+    #float: right;
+    margin-left: 40px;
+}
+
+.titleLine {
+    padding: 6px;
+}
+.doiLine, .pdfLine, .identifierLine {
+    padding: 2px;
+}
+
+
+.articleLine {
+    margin-bottom: 10px;
+    padding: 8px;
+    background-color: #dddddd;
+    float: clear;
+}
+
+.identifierLine a:link {
+    background-color: #ddffff; 
+    margin-right: 20px; 
+    margin-bottom: 5px;
+    padding: 2px;
+    font-size: 90%;
+}
+
+
+.bibeditLine {
+    font-weight: bold;
+}
+
+span.bibeditLine {
+    display: block;
+    margin-bottom: 10px;
+
+}
+
+.doiLine, .pdfLine {
+    margin-left: 40px;
+    font-size: 90%;
+
+}
