@@ -409,31 +409,14 @@ if RUN_MODE == 'production':
         # "no parameters submitted = no form submitted"
         HaveParm = False
 else:
-<<<<<<< HEAD
-<<<<<<< HEAD
-	##development run ######################
-	## dummy values, only needed for testing
-	CATALOGER = 'bhecker'
-	PASSWORD = 'fakepassword'
-	#QUEUE = 'Inspire-References'
-	QUEUE = 'HEP_curation'
-	QUANTITY = 5
-	HaveParm = True
-=======
-=======
->>>>>>> d6c01a98b49f9c7cc7a9ffbb3a31efd10a46333f
-    # development run ######################
-    # dummy values
+    ## development run ######################
+    ## dummy values
     CATALOGER = 'bhecker'
     PASSWORD = 'fakepassword'
     # QUEUE = 'Inspire-References'
     QUEUE = 'HEP_curation'
     QUANTITY = 5
     HaveParm = True
-<<<<<<< HEAD
->>>>>>> d6c01a98b49f9c7cc7a9ffbb3a31efd10a46333f
-=======
->>>>>>> d6c01a98b49f9c7cc7a9ffbb3a31efd10a46333f
 
 # begin build
 
