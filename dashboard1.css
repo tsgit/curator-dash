@@ -5,7 +5,6 @@ body {
 
 a:hover {
     background-color: #dddd44;
-
 }
 
 .linkCluster {
@@ -59,5 +58,4 @@ span.bibeditLine {
 .doiLine, .pdfLine {
     margin-left: 40px;
     font-size: 90%;
-
 }
