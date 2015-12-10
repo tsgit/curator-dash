@@ -5,7 +5,7 @@
 ##    created: 2013-05-11
 ##    major update: 2015-06
 ##    major extension: 2015-12
-##    last mod: 2015-12-10 10:29
+##    last mod: 2015-12-10 14:40
 ##
 ## hosted at:
 ##    test: https://tislnx3.slac.stanford.edu/cgi-bin/testgrpbibedit.py
@@ -220,7 +220,7 @@ def claim_tix(available_tix_result, quantx, catx, passx):
 
 
 #############################################################################
-def NEWbuildLinkout(idArray, GROUP):
+def NEWbuildLinkout(idArray, GROUP, CATALOGER, PASSWORD):
     '''Build the links to RT, INSPIRE records, arXiv PDFs, etc.
        that later get embedded in the display page.'''
 
@@ -413,6 +413,7 @@ else:
     ## dummy values
     CATALOGER = 'bhecker'
     PASSWORD = 'fakepassword'
+    PASSWORD = '1nsp2r3'
     # QUEUE = 'Inspire-References'
     QUEUE = 'HEP_curation'
     QUANTITY = 5
@@ -451,7 +452,7 @@ if HaveParm:
     logThis("Tickets pulled....")
 
     # claim the tickets
-    claim_msg, selected_tix = claim_tix(available_tix,
+    claim_msg, selected_tix = claim_tix(available_tix,\
                                         QUANTITY, CATALOGER, PASSWORD)
 
     # get the INSPIRE IDs that correspond to those RT records
