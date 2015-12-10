@@ -413,7 +413,6 @@ else:
     ## dummy values
     CATALOGER = 'bhecker'
     PASSWORD = 'fakepassword'
-    PASSWORD = '1nsp2r3'
     # QUEUE = 'Inspire-References'
     QUEUE = 'HEP_curation'
     QUANTITY = 5
