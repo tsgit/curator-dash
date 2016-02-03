@@ -1,4 +1,8 @@
-#!/usr/bin/python
+#!/u1/venvs/inspire-dashboard/bin/python
+import site
+site.addsitedir("/u1/venvs/inspire-dashboard/lib/python2.7/site-packages")
+import yappi
+
 ##########################################################
 ## grpbibedit.py
 ##    pulls data down from RT
@@ -25,6 +29,8 @@
 import cgi
 import cgitb
 import datetime
+import logging
+import os
 import urllib
 import urllib2
 
@@ -34,8 +40,11 @@ from invenio.search_engine import get_fieldvalues
 
 cgitb.enable()
 
-CLAIM_LOG = 'RT_ticket_claim.log'
+BASE = os.environ.get('VIRTUAL_ENV', '/u1/venvs/inspire-dashboard')
+CLAIM_LOG = BASE + '/var/log/RT_ticket_claim.log'
+WWWROOT = BASE + '/var/www/'
 
+QUEUE = 'HEP_curation'
 RUN_MODE = 'development'
 # RUN_MODE = 'production'
 
@@ -45,17 +54,17 @@ RUN_MODE = 'development'
 
 
 ############################################################################
-def logThis(msg):
-    LOGFILE = open(CLAIM_LOG, 'a')
-    LOGFILE.write(str(datetime.datetime.now()) + '\t' + msg + '\n')
-    LOGFILE.close()
+logging.basicConfig(filename=CLAIM_LOG,
+                    format='%(asctime)s %(levelname)s:%(message)s',
+                    datefmt='%m/%d/%Y %I:%M:%S',
+                    level=logging.DEBUG)
 
 
 #############################################################################
 def build_form_body():
 
     formbod = '''
-    <form name="input" action="grpbibedit.py" method="get">
+    <form name="input" action="curation_dashboard.py" method="get">
     <hr/>
 
     <div>Select your RT account:<select name="cataloger">
@@ -63,7 +72,7 @@ def build_form_body():
         <option value="kornienk">kornienk</option>
         <option value="sul">sul</option>
         <option value="bhecker">bhecker</option>
-        <option value="thschwander">thschwander</option>
+        <option value="thorsten">thorsten</option>
         <option selected value="none">none</option>
     </select>
     RT Password:<input type="password" name="pwd" required>
@@ -142,7 +151,7 @@ def claim_tix(available_tix_result, quantx, catx, passx):
     if (available_tix_result == "Could not connect to server.") \
        | (available_tix_result == 'Error. Credentials required.'):
         xmsg += "<h3>ERROR: %s </h3>" % available_tix_result
-        logThis("REQUEST ERROR:" + available_tix_result)
+        logging.error("REQUEST ERROR:" + available_tix_result)
     else:
         # parse the result returned by the query for available tickets,
         # harvest RT IDs
@@ -167,7 +176,7 @@ def claim_tix(available_tix_result, quantx, catx, passx):
         selected_ticket_ids = []
 
         if RUN_MODE == 'production':
-            logThis("Requesting ownership of " + str(quantx)
+            logging.info("Requesting ownership of " + str(quantx)
                     + " tickets for " + catx + '...')
 
             # take ownership of QUANTITY tickets ##############################
@@ -203,7 +212,7 @@ def claim_tix(available_tix_result, quantx, catx, passx):
 
                 xmsg += "."
 
-            logThis("Ownership claimed for " + catx
+            logging.info("Ownership claimed for " + catx
                     + '\t'+str(selected_ticket_ids) + '\n')
         else:
             #  RUN_MODE='development' ########
@@ -212,7 +221,7 @@ def claim_tix(available_tix_result, quantx, catx, passx):
                 startTime = datetime.datetime.now()
                 selected_ticket_ids.append(str(rx[i]['id']))
 
-            logThis("RUN_MODE=development, tickets not claimed in this run.")
+            logging.info("RUN_MODE=development, tickets not claimed in this run.")
             xmsg = 'Development run, tickets not claimed.'
 
     # xmsg has durations for the claim operation
@@ -228,7 +237,6 @@ def NEWbuildLinkout(idArray, GROUP, CATALOGER, PASSWORD):
     # and an INSPIRE id
     bibeditHead = '<a href="https://inspirehep.net/record/edit/' \
                   + '?ln=en#state=search&amp;p='
-    bibeditHTML = ''
     inspireIDs = []
     # idArray is a list of dictionaries, ex.,
     # { 'inspireID':inspireID, 'RTid':ticketNum }
@@ -258,23 +266,27 @@ def NEWbuildLinkout(idArray, GROUP, CATALOGER, PASSWORD):
                         RTnumber = rr['RTid']
                         RTlinkout = ' <a href="https://rt.inspirehep.net/Ticket/Display.html?id=%s">RT#: %s</a> ' % (RTnumber, RTnumber)
                 # arXiv
-                arxivNumber = fieldValueArray['arxivID'].split('arXiv.org:')[1]
-                arXivLinks = ' <a href="http://arxiv.org/abs/%s">arxiv:%s</a> <a href="http://arxiv.org/pdf/%s">arXiv:PDF</a> ' % (arxivNumber, arxivNumber, arxivNumber)
-
+                if 'arxivID' in fieldValueArray:
+                    arxivNumber = fieldValueArray['arxivID'].split('arXiv.org:')[1]
+                if arxivNumber:
+                    arXivLinks = ' <a href="http://arxiv.org/abs/%s">arxiv:%s</a> <a href="http://arxiv.org/pdf/%s">arXiv:PDF</a> ' % (arxivNumber, arxivNumber, arxivNumber)
+                else:
+                    arXivLinks = '<!-- no arXiv id -->'
                 identifierLinks = '<div class="identifierLine"><a href="http://inspirehep.net/record/' + str(j) + '">INSPIRE: ' + str(j) + "</a>" + RTlinkout + arXivLinks + '</div>' \
 
                 # TITLE
-                titleLine = '\n' + '<div class="titleLine"> <b>' \
-                            + fieldValueArray['245__a'][0] + '</b></div>\n'
+                titleLine = '<div class="titleLine"> <b>' \
+                            + fieldValueArray['245__a'][0] + '</b></div>'
 
                 # DOI
                 if len(fieldValueArray['0247_2']) > 0 \
                    and fieldValueArray['0247_2'][0] == 'DOI':
                     doiv = fieldValueArray['0247_a'][0]
-                    doiLine = '\n  <div class="doiLine">DOI: <a href="http://dx.doi.org/' \
-                              + doiv + '">' + doiv + '</a></div>\n'
+                    doiLine = ('<div class="doiLine">DOI: ' +
+                               '<a href="http://dx.doi.org/%(doiv)s">%(doiv)s</a>' +
+                               '</div>' % {'doiv': doiv})
                 else:
-                    doiLine = ''
+                    doiLine = '<!-- no DOI -->'
 
                 # PDF
                 # NOTE: we won't pick up PDFs like
@@ -285,33 +297,51 @@ def NEWbuildLinkout(idArray, GROUP, CATALOGER, PASSWORD):
                     for p in fieldValueArray['8564_u']:
                         pdfLinks += '<div class="pdfLink"> <a href="' + p \
                                     + '">' + p + '</a></div> '
+                pdfLine = '<div class="pdfLine">' + pdfLinks + '</div>'
 
-                pdfLine = '\n   <div class="pdfLine">' + pdfLinks + '</div>\n'
-                detailLinks += '\n <div class="articleLine">\n' + titleLine \
-                               + identifierLinks + doiLine + pdfLine \
-                               + '\n</div>\n'
+                detailLinks += """            <div class="articleLine">
+                %(titleLine)s
+                %(identifierLinks)s
+                %(doiLine)s
+                %(pdfLine)s
+            </div>
+""" % {'titleLine': titleLine, 'identifierLinks': identifierLinks,
+       'doiLine': doiLine, 'pdfLine': pdfLine}
             # store the cluster of lines for each bibedit linkout group
-            linksOutput += '\n<li><div class="linkCluster">'+bibeditLine \
-                           + detailLinks+'</div></li>\n'
+            linksOutput += ('            <li><div class="linkCluster">' +
+                            bibeditLine +
+                            detailLinks +
+                            '            </div></li>')
 
         # wrap it up, and write the output file
         datex = datetime.datetime.now().strftime("%Y:%m:%d  %H:%M:%S")
-        outputHTML = '<html><head><title>Dashboard linkouts</title>' \
-                     + '<link href="dashboard1.css" rel="stylesheet" type="text/css" media="all" >' \
-                     + '</head><body>\n' + '<h2>' + CATALOGER \
-                     + ':  Dashboard for Queue ' + QUEUE\
-                     + '</h2>\n \n <ol>' + linksOutput + '</ol>' \
-                     + '\n\n <code>' + datex + '</code></body></html>'
+        outputHTML = """<!DOCTYPE html>
+<html>
+    <head>
+        <title>Dashboard linkouts</title>
+        <link href="dashboard1.css" rel="stylesheet" type="text/css" media="all" />
+    </head>
+    <body>
+        <h2>%(CATALOGER)s: Dashboard for Queue %(QUEUE)s</h2>
 
-        if RUN_MODE == 'production':
-            slacfile = '/var/www/html/' + CATALOGER + 'bibedit.html'
+        <ol>
+%(linksOutput)s
+        </ol>
+
+        <code>%(datex)s</code>
+    </body>
+</html>""" % {'CATALOGER': CATALOGER, 'QUEUE': QUEUE,
+              'linksOutput': linksOutput, 'datex': datex}
+
+        # if RUN_MODE == 'production':
+        if True:
+            slacfile = WWWROOT + CATALOGER + 'bibedit.html'
         else:
             slacfile = './' + CATALOGER + 'bibedit.html'
 
         with open(slacfile, 'wb') as outfile:
             outfile.write(outputHTML)
-
-    return bibeditHTML
+    return
 
 
 #############################################################################
@@ -350,7 +380,7 @@ def NEWgetInspireIDs(list_of_tix, catx, passx):
     '''
 
     ticketNum_inspireIDs = []
-    logThis("getInspireID request dispatch loop...")
+    logging.info("getInspireID request dispatch loop...")
 
     reqdatx = {}
     reqdatx['user'] = catx
@@ -379,115 +409,134 @@ def NEWgetInspireIDs(list_of_tix, catx, passx):
         ticketNum_inspireIDs.append({'inspireID': inspireID,
                                      'RTid': ticketNum})
 
-    logThis("NEWgetInspireID request completed...")
+    logging.info("NEWgetInspireID request completed...")
     return ticketNum_inspireIDs
+
 
 #############################################################################
 # main
+def main():
 
-GROUPBY = 5  # number of tickets to include in each bibedit linkout
+    GROUPBY = 5  # number of tickets to include in each bibedit linkout
 
-# read any parameters
-xform = cgi.FieldStorage()
-formmsg = ''
+    # read any parameters
+    xform = cgi.FieldStorage()
+    formmsg = ''
 
-# RUN_MODE is a convenience for testing and development.
-#   When set to "development", the run does not claim RT tickets
-if RUN_MODE == 'production':
+    # RUN_MODE is a convenience for testing and development.
+    #   When set to "development", the run does not claim RT tickets
+    if RUN_MODE == 'production':
 
-    # check to see if a form has been submitted
-    if 'cataloger' in xform:
+        # check to see if a form has been submitted
+        if 'cataloger' in xform:
+            HaveParm = True
+            CATALOGER = xform.getvalue("cataloger")
+            PASSWORD = xform.getvalue('pwd')
+            # QUANTITY = total number of tickets to pull
+            QUANTITY = int(xform.getvalue('quantity'))
+            QUEUE = xform.getvalue('queue')
+            formmsg = ("<p>cataloger:" + CATALOGER +
+                       ' Queue: ' + QUEUE + '</p>\n')
+            formmsg += "<p>quantity:" + str(QUANTITY) + '</p>\n\n</hr>'
+        else:
+            # "no parameters submitted = no form submitted"
+            HaveParm = False
+    else:
+        # development run ######################
+        # dummy values
+        CATALOGER = ''
+        PASSWORD = ''
+        # QUEUE = 'Inspire-References'
+        QUEUE = 'HEP_curation'
+        QUANTITY = 5
         HaveParm = True
-        CATALOGER = xform.getvalue("cataloger")
-        PASSWORD = xform.getvalue('pwd')
-        # QUANTITY = total number of tickets to pull
-        QUANTITY = int(xform.getvalue('quantity'))
-        QUEUE = xform.getvalue('queue')
-        formmsg = "<p>cataloger:" + CATALOGER + ' Queue: ' + QUEUE + '</p>\n'
-        formmsg += "<p>quantity:" + str(QUANTITY) + '</p>\n\n</hr>'
-    else:
-        # "no parameters submitted = no form submitted"
-        HaveParm = False
-else:
-    ## development run ######################
-    ## dummy values
-    CATALOGER = 'bhecker'
-    PASSWORD = 'fakepassword'
-    # QUEUE = 'Inspire-References'
-    QUEUE = 'HEP_curation'
-    QUANTITY = 5
-    HaveParm = True
 
-# begin build
+    # begin build
 
-htmlheader = '''Content-Type: text/html\n\n'''
+    htmlheader = '''Content-Type: text/html\n\n'''
 
-htmltop = '''<html><head>
-    <title>RT ticket batch claim</title></head>
+    htmltop = '''<html>
+    <head>
+        <title>RT ticket batch claim</title>
+    </head>
     <body>
-    <h1>RT batch ticket claiming for catalogers</h1>
-    <h5>v 2.0</h5>
-    <p>Please select your account and the number of tickets, and then submit.
-'''
-htmltail = '</body></html>'
+        <h1>RT batch ticket claiming for catalogers</h1>
+        <h5>v 2.0</h5>
+        <p>Please select your account and the number of tickets, and then submit.</p>
+    '''
+    htmltail = '''    </body>
+</html>'''
 
-if HaveParm:
+    if HaveParm:
 
-    logThis("+================= Run beginning ================+")
-    logThis(CATALOGER + ", queue=" + QUEUE + ", quantity=" + str(QUANTITY))
+        logging.info("+================= Run beginning ================+")
+        logging.info(CATALOGER + ", queue=" + QUEUE +
+                     ", quantity=" + str(QUANTITY))
 
-    reqdata = {}
-    reqdata['user'] = CATALOGER
-    reqdata['pass'] = PASSWORD
-    reqdata['query'] = "Queue='" + QUEUE + \
-                       "' AND Owner='Nobody' AND status='new'"
-    reqdata['orderby'] = '+Created'  # ordering; use '-' for descending
-    reqdata['format'] = 'l'
+        reqdata = {}
+        reqdata['user'] = CATALOGER
+        reqdata['pass'] = PASSWORD
+        reqdata['query'] = "Queue='" + QUEUE + \
+                           "' AND Owner='Nobody' AND status='new'"
+        reqdata['orderby'] = '+Created'  # ordering; use '-' for descending
+        reqdata['format'] = 'l'
 
-    # execute the query to pull oldest available tickets in QUEUE
-    # owned by Nobody
-    available_tix = get_available_tickets(QUEUE, CATALOGER, PASSWORD)
+        # execute the query to pull oldest available tickets in QUEUE
+        # owned by Nobody
+        available_tix = get_available_tickets(QUEUE, CATALOGER, PASSWORD)
 
-    logThis("Tickets pulled....")
+        logging.info("Tickets pulled....")
 
-    # claim the tickets
-    claim_msg, selected_tix = claim_tix(available_tix,\
-                                        QUANTITY, CATALOGER, PASSWORD)
+        # claim the tickets
+        claim_msg, selected_tix = claim_tix(available_tix,
+                                            QUANTITY, CATALOGER, PASSWORD)
 
-    # get the INSPIRE IDs that correspond to those RT records
-    # RT_inspire_ids is a list of dictionaries
-    RT_inspire_ids = NEWgetInspireIDs(selected_tix, CATALOGER, PASSWORD)
-    logThis("RT_inspire_ids:"+str(RT_inspire_ids))
+        # get the INSPIRE IDs that correspond to those RT records
+        # RT_inspire_ids is a list of dictionaries
+        RT_inspire_ids = NEWgetInspireIDs(selected_tix, CATALOGER, PASSWORD)
+        logging.info("RT_inspire_ids:"+str(RT_inspire_ids))
 
-    # return the bibedit linkout markup,
-    linktext = NEWbuildLinkout(RT_inspire_ids, GROUPBY, CATALOGER, PASSWORD)
+        # generate the html file with bibedit linkout markup,
+        NEWbuildLinkout(RT_inspire_ids, GROUPBY, CATALOGER, PASSWORD)
 
-    if RT_inspire_ids[0]['inspireID'] == []:
-        linktext = ''
-        toDashboard = 'No RecIDs found in these tickets.' \
-                      + ' No dashboard generated.'
+        if RT_inspire_ids[0]['inspireID'] == []:
+            toDashboard = 'No RecIDs found in these tickets.' \
+                          + ' No dashboard generated.'
+        else:
+            toDashboard = ('Go to the dashboard page: ' +
+                           '<a href=https://inspire-vm1.slac.stanford.edu/' +
+                           CATALOGER + 'bibedit.html target=bibedit>' +
+                           CATALOGER + 'bibedit.html </a> \n')
+
+        InspireIDlist = []
+        for r in RT_inspire_ids:
+            InspireIDlist.append(r['inspireID'])
+
+            finalmsg = (htmlheader + htmltop + '\n\n' +
+                        build_form_body() + '\n' + toDashboard +
+                        '<hr/>\n<div class="inspire-ids">' +
+                        '<h3>Inspire IDs</h3>\n<p>' +
+                        ", ".join(InspireIDlist) + '</p>\n\n' +
+                        '<hr/></div>\n ' + htmltail)
+
+        logging.info("+----------------- Completed Run ----------------+")
+        return(finalmsg)
+
     else:
-        toDashboard = 'Go to the dashboard page: <a href=https://tislnx3.slac.stanford.edu/' + \
-                      CATALOGER + 'bibedit.html target=bibedit>' + CATALOGER \
-                      + 'bibedit.html </a> \n'
+        # no parameters passed, so just display the form
+        finalmsg = htmlheader + htmltop + '\n  ' + '\n'+build_form_body() \
+            + '<hr/>\n ' + htmltail
 
-    InspireIDlist = []
-    for r in RT_inspire_ids:
-        InspireIDlist.append(r['inspireID'])
-
-        finalmsg = htmlheader + htmltop + '\n  ' + '\n' + build_form_body() + '\n' + toDashboard \
-            + '<hr/>\n<div class="inspire-ids"><h3>Inspire IDs</h3>\n<p>' \
-            + ", ".join(InspireIDlist) + '</p>\n\n' \
-            + '<hr/></div>\n ' + htmltail
-
-    print finalmsg
-    logThis("+----------------- Completed Run ----------------+")
+        logging.info("+--     --    -- - Form Displayed - --  --  --  -+")
+        return(finalmsg)
 
 
-else:
-    # no parameters passed, so just display the form
-    finalmsg = htmlheader + htmltop + '\n  ' + '\n'+build_form_body() \
-        + '<hr/>\n ' + htmltail
-
-    print finalmsg
-    logThis("+--     --    -- - Form Displayed - --  --  --  -+")
+if __name__ == '__main__':
+    # yappi.set_clock_type('cpu')
+    yappi.set_clock_type('wall')
+    yappi.start(builtins=True)
+    out = main()
+    yappi.stop()
+    print out
+    stats = yappi.get_func_stats()
+    stats.save('/tmp/callgrind.out', type='callgrind')
