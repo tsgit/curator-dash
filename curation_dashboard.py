@@ -64,7 +64,7 @@ logging.basicConfig(filename=CLAIM_LOG,
 def build_form_body():
 
     formbod = '''
-    <form name="input" action="curation_dashboard.py" method="get">
+    <form name="input" action="curation_dashboard.py" method="post">
     <hr/>
 
     <div>Select your RT account:<select name="cataloger">
